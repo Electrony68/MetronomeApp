@@ -17,9 +17,13 @@ final class MetronomeViewModel {
     var currentBeatIndex: Int = 0
     var errorMessage: String? = nil
 
+    var practiceTimerMinutes: Int = 0       // 0 = ingen timer
+    var timerRemainingSeconds: Int = 0
+
     // MARK: – Privat
     private let engine = MetronomeEngine()
     private var beatTask: Task<Void, Never>? = nil
+    private var timerTask: Task<Void, Never>? = nil
 
     private var tapTimestamps: [Date] = []
     private let maxTaps = 8
@@ -97,6 +101,7 @@ final class MetronomeViewModel {
                 isPlaying = true
                 barCount  = 0
                 startBeatTask()
+                startTimer()
             } catch {
                 errorMessage = error.localizedDescription
             }
@@ -108,6 +113,40 @@ final class MetronomeViewModel {
         await engine.stop()
         isPlaying = false
         cancelBeatTask()
+        cancelTimer()
+    }
+
+    // MARK: – Timer
+
+    func setTimer(minutes: Int) {
+        practiceTimerMinutes = minutes
+        if !isPlaying {
+            timerRemainingSeconds = minutes * 60
+        }
+    }
+
+    private func startTimer() {
+        guard practiceTimerMinutes > 0 else { return }
+        timerRemainingSeconds = practiceTimerMinutes * 60
+        timerTask = Task { [weak self] in
+            while true {
+                try? await Task.sleep(for: .seconds(1))
+                guard let self, !Task.isCancelled else { return }
+                if self.timerRemainingSeconds > 0 {
+                    self.timerRemainingSeconds -= 1
+                }
+                if self.timerRemainingSeconds == 0 {
+                    await self.stop()
+                    return
+                }
+            }
+        }
+    }
+
+    private func cancelTimer() {
+        timerTask?.cancel()
+        timerTask = nil
+        timerRemainingSeconds = practiceTimerMinutes * 60
     }
 
     // MARK: – Parameterändringar

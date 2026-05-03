@@ -3,43 +3,66 @@ import Testing
 
 struct ScaleTests {
 
-    // MARK: – DroneInterval
+    // MARK: – DroneInterval semitones
 
-    @Test func droneIntervalSemitonesFixed() {
-        #expect(DroneInterval.none.semitones == 0)
-        #expect(DroneInterval.fifth.semitones == 7)
-        #expect(DroneInterval.octave.semitones == 12)
+    @Test func fixedIntervalsUnaffectedByScale() {
+        for mode in ScaleMode.allCases {
+            #expect(DroneInterval.root.semitones(for: mode)   == 0)
+            #expect(DroneInterval.fourth.semitones(for: mode) == 5)
+            #expect(DroneInterval.fifth.semitones(for: mode)  == 7)
+        }
     }
 
-    @Test func droneIntervalThirdIsMajorForMajorScales() {
-        for mode in [ScaleMode.major, .mixolydian, .pentatonicMajor, .root] {
+    @Test func thirdIsMajorForMajorAndRoot() {
+        for mode in [ScaleMode.major, .root] {
             #expect(DroneInterval.third.semitones(for: mode) == 4,
                     "\(mode.rawValue) should yield major third (4 semitones)")
         }
     }
 
-    @Test func droneIntervalThirdIsMinorForMinorScales() {
-        for mode in [ScaleMode.minor, .dorian, .pentatonicMinor] {
-            #expect(DroneInterval.third.semitones(for: mode) == 3,
-                    "\(mode.rawValue) should yield minor third (3 semitones)")
+    @Test func thirdIsMinorForMinor() {
+        #expect(DroneInterval.third.semitones(for: .minor) == 3)
+    }
+
+    @Test func seventhIsMajorForMajorAndRoot() {
+        for mode in [ScaleMode.major, .root] {
+            #expect(DroneInterval.seventh.semitones(for: mode) == 11,
+                    "\(mode.rawValue) should yield major seventh (11 semitones)")
         }
     }
 
-    @Test func nonThirdIntervalsUnaffectedByScale() {
-        for mode in ScaleMode.allCases {
-            #expect(DroneInterval.fifth.semitones(for: mode)  == 7)
-            #expect(DroneInterval.octave.semitones(for: mode) == 12)
-            #expect(DroneInterval.none.semitones(for: mode)   == 0)
-        }
+    @Test func seventhIsMinorForMinor() {
+        #expect(DroneInterval.seventh.semitones(for: .minor) == 10)
+    }
+
+    // MARK: – DroneConfiguration interval toggle
+
+    @Test func toggleAddsAndRemovesInterval() {
+        var config = DroneConfiguration()
+        config.activeIntervals = [.root]
+
+        config.toggle(.fifth)
+        #expect(config.activeIntervals.contains(.fifth))
+
+        config.toggle(.fifth)
+        #expect(!config.activeIntervals.contains(.fifth))
+    }
+
+    @Test func toggleCannotRemoveLastInterval() {
+        var config = DroneConfiguration()
+        config.activeIntervals = [.root]
+
+        config.toggle(.root)
+        #expect(config.activeIntervals == [.root])
     }
 
     // MARK: – MusicalKey
 
     @Test func musicalKeySemitoneOffsets() {
-        #expect(MusicalKey.c.semitoneOffset  == 0)
+        #expect(MusicalKey.c.semitoneOffset     == 0)
         #expect(MusicalKey.cSharp.semitoneOffset == 1)
-        #expect(MusicalKey.a.semitoneOffset  == 9)
-        #expect(MusicalKey.b.semitoneOffset  == 11)
+        #expect(MusicalKey.a.semitoneOffset     == 9)
+        #expect(MusicalKey.b.semitoneOffset     == 11)
     }
 
     @Test func allTwelveTonesPresent() {
@@ -61,8 +84,7 @@ struct ScaleTests {
         #expect(ScaleMode.root.intervals == [0])
     }
 
-    @Test func pentatonicScalesHaveFiveNotes() {
-        #expect(ScaleMode.pentatonicMajor.intervals.count == 5)
-        #expect(ScaleMode.pentatonicMinor.intervals.count == 5)
+    @Test func onlyThreeScaleModesAvailable() {
+        #expect(ScaleMode.allCases.count == 3)
     }
 }

@@ -41,7 +41,7 @@ struct BPMTests {
         let c = BPM(rawValue: 110)
         #expect(a == b)
         #expect(a != c)
-        var set: Set<BPM> = [a, b, c]
+        let set: Set<BPM> = [a, b, c]
         #expect(set.count == 2)
     }
 

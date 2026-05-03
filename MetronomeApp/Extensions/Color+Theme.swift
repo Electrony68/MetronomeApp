@@ -12,4 +12,7 @@ extension Color {
     static let cardBackground   = Color(.secondarySystemBackground)
     static let primaryText      = Color(.label)
     static let secondaryText    = Color(.secondaryLabel)
+
+    // Soundbrenner-inspirerad kol-bakgrund (#131318)
+    static let coalBackground   = Color(red: 0.075, green: 0.075, blue: 0.094)
 }

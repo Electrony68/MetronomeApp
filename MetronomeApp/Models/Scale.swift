@@ -36,26 +36,18 @@ enum MusicalKey: String, CaseIterable, Codable, Sendable, Identifiable {
 }
 
 enum ScaleMode: String, CaseIterable, Codable, Sendable, Identifiable {
-    case root            = "Root"
-    case major           = "Major"
-    case minor           = "Minor"
-    case dorian          = "Dorian"
-    case mixolydian      = "Mixolydian"
-    case pentatonicMajor = "Pentatonic Major"
-    case pentatonicMinor = "Pentatonic Minor"
+    case root  = "Root"
+    case major = "Major"
+    case minor = "Minor"
 
     var id: String { rawValue }
 
     /// Halvtonsintervall för varje skalsteg ovanför grundton.
     var intervals: [Int] {
         switch self {
-        case .root:            [0]
-        case .major:           [0, 2, 4, 5, 7, 9, 11]
-        case .minor:           [0, 2, 3, 5, 7, 8, 10]
-        case .dorian:          [0, 2, 3, 5, 7, 9, 10]
-        case .mixolydian:      [0, 2, 4, 5, 7, 9, 10]
-        case .pentatonicMajor: [0, 2, 4, 7, 9]
-        case .pentatonicMinor: [0, 3, 5, 7, 10]
+        case .root:  [0]
+        case .major: [0, 2, 4, 5, 7, 9, 11]
+        case .minor: [0, 2, 3, 5, 7, 8, 10]
         }
     }
 }

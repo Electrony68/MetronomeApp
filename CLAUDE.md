@@ -1,8 +1,4 @@
-# MetronomeApp – Projektdokumentation
-
-## Vad är det här?
-iPad-app (iPadOS 17+) med sample-accurate metronom och realtids-dronesyntes.
-Byggs i Xcode 16+ med Swift 6 (strict concurrency) och SwiftUI + @Observable.
+# CLAUDE.md – MetronomeApp
 
 ## Teknikstack
 - **Språk:** Swift 6.0, SwiftUI, Observation-ramverket
@@ -20,76 +16,119 @@ MetronomeApp/
 ├── Sources/
 │   ├── App/        MetronomeApp.swift
 │   ├── Models/     BPM, TimeSignature, AccentPattern, Scale, DroneConfiguration, Preset, TempoMarking
-│   ├── ViewModels/ MetronomeViewModel, DroneViewModel, SettingsViewModel  (Fas 3)
-│   ├── Views/      ContentView + komponenter                              (Fas 4)
+│   ├── ViewModels/ MetronomeViewModel, DroneViewModel, SettingsViewModel
+│   ├── Views/      ContentView + komponenter
 │   ├── Services/   AudioEngineService, MetronomeEngine, DroneEngine,
-│   │               HapticsService, PersistenceService                     (Fas 2)
+│   │               HapticsService, PersistenceService
 │   └── Extensions/ Color+Theme, View+Modifiers
 └── Resources/
-    ├── Assets.xcassets   (AccentColor cyan/turkos, 7 namngivna färger, AppIcon)
-    └── Localizable.xcstrings  (engelska endast)
+    ├── Assets.xcassets   (AccentColor grå ~#919199, 7 namngivna färger, AppIcon)
+    └── Localizable.xcstrings  (engelska)
 ```
 
 ## Implementeringsstatus
-| Fas | Innehåll | Status |
-|-----|----------|--------|
-| 1 | Projektskelett + Models + Extensions + Assets | ✅ Klar |
-| 2 | AudioEngineService, MetronomeEngine, DroneEngine, HapticsService, PersistenceService | ✅ Klar |
-| 3 | ViewModels (MetronomeViewModel, DroneViewModel, SettingsViewModel) | ✅ Klar |
-| 4 | Views & Komponenter (BPMDial, BeatIndicator, TapTempo m.fl.) | ✅ Klar |
-| 5 | iPad-specifikt: keyboard shortcuts, grundläggande VoiceOver-etiketter | ✅ Klar |
-| 6 | Tester, lokalisering, README | ✅ Klar |
+
+| Version | Innehåll | Status |
+|---------|----------|--------|
+| v1.0 | Projektskelett, Models, Services, ViewModels, Views, iPad-stöd, tester | ✅ Klar |
+| v1.1 funktioner | Drone-ombyggnad + övningstimer | ✅ Klar |
+| v1.1 GUI | Soundbrenner-inspirerad redesign | ✅ Klar |
+
+## Versionshistorik
+
+### v1.0
+- Sample-accurate metronom (look-ahead AVAudioTime-schemaläggning)
+- Realtids-dronesyntes med tre vågformer
+- BPM-ratt, taktart, accentmönster, tap tempo, auto-accelerate
+- Presets, persistens via UserDefaults
+- Keyboard shortcuts, VoiceOver
+- 41 unit tests
+
+### v1.1 — Funktioner (2026-05-03)
+**Drone:**
+- `ScaleMode` reducerad till `.root`, `.major`, `.minor`
+- Nytt intervallsystem: `.root`, `.third`, `.fourth`, `.fifth`, `.seventh` — alla togglebara simultant
+- `DroneConfiguration.activeIntervals: Set<DroneInterval>` (ersätter `additionalInterval`)
+- `DroneConfiguration.toggle(_ interval:)` — minst ett intervall alltid aktivt
+- Third och Seventh skalmedvetna: minor → 3/10 halvtoner, major/root → 4/11
+- Sine-vågform borttagen ur `Waveform`-enum
+- `DroneEngine` blandar upp till 5 frekvenser simultant
+- Organ-tremolo: LFO 1,5 Hz ±20% amplitud (rotary-speaker)
+- Strings: vibrato 5 Hz ±0,5% (oförändrat)
+
+**Metronom:**
+- Övningstimer 0–60 minuter (`practiceTimerMinutes`, `timerRemainingSeconds`)
+- Startar vid play, stoppar metronomen automatiskt vid 0
+- UI: timer-popover (ersatt av ikonknapp i toppraden i v1.1 GUI)
+
+**Tester:** 44/44 gröna (ScaleTests omskrivna för nytt API)
+
+## v1.1 GUI — Soundbrenner-inspirerad redesign (2026-05-03)
+
+**Global:**
+- `preferredColorScheme(.dark)` på ContentView — hela appen är mörk
+- `Color.coalBackground` (#131318) ersätter system-bakgrunder
+- `AppButtonStyle(.secondary)` använder `Color.white.opacity(0.10)` i stället för tertiarySystemBackground
+
+**BPMDial (ombyggd):**
+- Full cirkel (360°) med 60 tick-marks runt kanten (major var 5:e)
+- Progress-arc startar vid 12-klockan, mapping 30–300 BPM → 0–100 %
+- Storlek: 360 pt, track: 280 pt (10 pt lineWidth), tick-radius: 162 pt
+- Stor siffra i mitten (78 pt bold rounded), vit
+
+**MetronomeView (fullskärm, ingen NavigationStack):**
+- Topp-rad: 5 taktarts-knappar + [timer] [volume] [accent]-ikoner
+- Center: BPMDial (hero) + tempo-marking under
+- Botten: Play (vänster) + Tap (höger) — 80×80 knappar
+- Övningstimer i popover från timer-ikonen
+- Volym i popover från speaker-ikonen
+- AccentPatternEditor i sheet (.medium detent) från waveform-ikonen
+
+**DroneView (ny struktur):**
+- Intervals-kort alltid synligt (main musical control)
+- Key & Scale i DisclosureGroup (öppen som standard)
+- Sound (Waveform, Octave, Volume) i DisclosureGroup (öppen)
+- Tuning (Reference A4) i DisclosureGroup (stängd, visar Hz i etiketten)
+- Coal-bakgrund via `.scrollContentBackground(.hidden)` + `.background(Color.coalBackground)`
+
+**App-namn:** "Metronomy" (CFBundleDisplayName i Info.plist)
 
 ## Tekniska beslut
-- **Timing:** `scheduleBuffer(at: AVAudioTime)` med look-ahead scheduling – aldrig Timer
-- **Dronesyntes:** `AVAudioSourceNode` render-callback på audio-tråden – lock-free, ingen allokering
-- **Concurrency:** Audio-kod i `actor AudioActor`, UI på `@MainActor`
-- **Beat-indikator:** Synkad till `AVAudioTime`, inte wall clock (CADisplayLink eller TimelineView)
-- **Klick-ljud:** Genereras i kod (inte sample-filer)
-- **A4-referens:** Konfigurerbar 415–446 Hz, default 440 Hz
 
-## Fas 5 – Tekniska beslut och noteringar
-- Keyboard shortcuts i `MetronomeView`: mellanslag (play/stop), ↑↓ (BPM ±1), ←→ (BPM ±10) via dolda `Button`-element med `.keyboardShortcut`; T (tap tempo) i `TapTempoButton`
-- Dolda knappar: `.opacity(0).allowsHitTesting(false).accessibilityHidden(true)` — SwiftUI-idiom för tangentbordsgenvägar utan visuell effekt
-- Apple Pencil-stöd utelämnat medvetet — inte relevant för use caset
-- VoiceOver var redan väl täckt från Fas 4; tillagd `accessibilityLabel/Value` på Reference A4-slidern i DroneView
+### MetronomeEngine timing — KRITISKT
+- Schemaläggning sker med `AVAudioTime(hostTime: mach_absolute_time())` — ALDRIG sample-domänen
+- `playerNode.lastRenderTime` och `outputNode.lastRenderTime` har **olika nollpunkter** — inte utbytbara
+- Look-ahead kedjedesign: beat N:s callback schemalägger beat N+2 (två parallella kedjor)
+- Generations-räknare (`generation: Int`) förhindrar galopp-effekt vid BPM-byte i farten
+- `.off`-slag schemalägger tyst buffer — callback-kedjan måste aldrig brytas
 
-## Fas 4 – Tekniska beslut och noteringar
-- `ContentView`: `TabView` med tre flikar (Metronome / Drone / Settings), fungerar på iPadOS 17+
-- `MetronomeApp`: ViewModels skapas som `@State` i App-structen, injiceras via `.environment()`, setup körs med `.task {}`
-- `BPMDial`: Arc-ratt (270°, SwiftUI `Shape`), vertikal drag-gest (`dragStartBPM` sparas vid geststart för stabil delta-beräkning), handle-position beräknas med trigonometri och `.position()`
-- `BeatIndicator`: `onChange(of: currentBeat)` triggar `withAnimation` + `Task.sleep`-sekvens för attack/decay-puls
-- `AccentPatternEditor`: Cyklar AccentLevel via `next`-extension (strong→medium→weak→off→strong)
-- `PresetListView`: `Text("\(bpm.description)")` — använd `.description` explicit för att undvika `LocalizedStringKey appendInterpolation`-varning
-- `@Bindable var vm = metronomeVM` i view body: standard-mönster för `@Observable` + `@Environment`; async setters anropas via `.onChange(of:)` + `Task { @MainActor in }`
-- Verifierat: bygg utan varningar/fel i Xcode 16, Swift 6 strict concurrency
-- `DroneInterval.third`: skalmedveten ters — mollters (3 halvtoner) för minor/dorian/pentatonic minor, durters (4 halvtoner) annars; beräknas i `DroneEngine.applyConfig` via `semitones(for: scaleMode)`
-- Lokalisering: svenska översättningar borttagna, appen är engelska rakt igenom
+### DroneEngine — flerfrekvensblandning
+- `SynthState.frequencies: [Double]` (5 element), `frequencyCount: Int` — sätts från actor-tråden
+- `phases`, `filterStates`: [Double] (5 el.) — audio-thread-only, ingen `nonisolated(unsafe)`
+- Intervallordning i `applyConfig`: root → third → fourth → fifth → seventh (deterministisk)
+- Normalisering: summan divideras med `frequencyCount` för konstant volym oavsett antal intervall
 
-## MetronomeEngine – Tekniska beslut och lärdommar
+### Concurrency
+- Audio-kod i `actor AudioActor` / `actor DroneEngine` / `actor MetronomeEngine`
+- UI på `@MainActor`
+- `SynthState` är `final class @unchecked Sendable` med `nonisolated(unsafe)` för delade parametrar
 
-**Status: ✅ Fullt fungerande** — verifierat på fysisk iPad Air 13-inch (M4), iPadOS 18.
-
-**Timing-domän:** Schemaläggning sker med `AVAudioTime(hostTime:)` baserat på `mach_absolute_time()`.
-- `AVAudioPlayerNode.lastRenderTime` och `outputNode.lastRenderTime` har *olika nollpunkter* och är inte utbytbara för `scheduleBuffer(at:)`.
-- Host time (Mach-klockan) är den enda domänen som alltid är korrekt för AVAudioEngine-schemaläggning.
-
-**Kedjedesign (look-ahead):** `start()` förschemalagt beat 0 och beat 1. När beat N:s callback triggar schemaläggs beat N+2. Två parallella kedjor (jämna/udda) körs alltid simultant.
-
-**Generations-räknare:** `generation` ökas vid `stop()` och `setBPM()`. Callbacks kontrollerar att deras `capturedGeneration == self.generation` — annars ignoreras de. Förhindrar galopp-effekt vid BPM-ändringar i farten.
-
-**`.off`-slag:** Tyst buffer (noll-fylld) schemaläggs — callbacks triggas normalt och kedjan bryts aldrig. Tidigare `guard level != .off { return }` dödade kedjan.
-
-## Fas 2 – Tekniska beslut och noteringar
-- `AudioEngineService`: notification-observering via `NotificationCenter.notifications(named:)` async-stream (inte `addObserver`) — krävs för Swift 6 `sending`-compliance
-- `MetronomeEngine`: look-ahead scheduling med `AVAudioPlayerNode.scheduleBuffer(at: AVAudioTime)`, pre-genererade klick-buffertar (exp. avklingssinusvåg), `AsyncStream<BeatEvent>` för UI-synk
-- `DroneEngine`: `AVAudioSourceNode` render-callback, `SynthState` (final class `@unchecked Sendable`) med `nonisolated(unsafe)` för delade parametrar; 3 vågformer (sinus, orgel 4 övertoner, stråkar 4-övertoners sågtand + IIR LP-filter + vibrato)
-- `HapticsService`: `@MainActor`, respekterar `UIAccessibility.isReduceMotionEnabled`
-- `PersistenceService`: actor, UserDefaults + JSONEncoder/Decoder för Settings, DroneConfiguration och Presets
-- VS Code SourceKit-LSP visar falska fel i AccentPattern.swift — ignorera, Xcode bygger rent
-
-## Viktigt att veta
-- Bakgrundsljud kräver fysisk iPad – simulatorn stöder inte `UIBackgroundModes = audio`
+### Övrigt
+- pywb körs ej här (det är WARC Search-projektet)
+- Bakgrundsljud kräver fysisk iPad — simulatorn stöder inte `UIBackgroundModes = audio`
 - Haptik fungerar inte i simulatorn
-- Swift 6 strict concurrency är påslaget (`SWIFT_VERSION = 6.0`)
-- Accentfärg: cyan/turkos (`AccentColor` i assets)
+- Swift 6 strict concurrency påslaget (`SWIFT_VERSION = 6.0`)
+- Accentfärg: grå ~#919199 (kall systemgrå, mörklägesvariant)
+- `TimeSignaturePicker.swift` och `WaveformPicker.swift` borttagna (inlinades i resp. vy)
+
+## Bygg och kör
+```bash
+# Öppna i Xcode
+open MetronomeApp.xcodeproj
+
+# Välj iPad som target-device, tryck Cmd+R
+# Tester: Cmd+U
+```
+
+Development-signerade builds löper ut efter 7 dagar.
+Återaktivera: Inställningar → Allmänt → VPN och enhetshantering → lita på certifikatet → Cmd+R i Xcode.

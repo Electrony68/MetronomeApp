@@ -93,8 +93,8 @@ final class DroneViewModel {
         await engine.updateConfiguration(configuration)
     }
 
-    func setInterval(_ interval: DroneInterval) async {
-        configuration.additionalInterval = interval
+    func toggleInterval(_ interval: DroneInterval) async {
+        configuration.toggle(interval)
         await engine.updateConfiguration(configuration)
     }
 

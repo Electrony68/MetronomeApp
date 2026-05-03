@@ -12,11 +12,11 @@ struct TapTempoButton: View {
         } label: {
             VStack(spacing: 4) {
                 Image(systemName: "hand.tap")
-                    .font(.system(size: 22, weight: .medium))
+                    .font(.system(size: 24, weight: .medium))
                 Text("Tap")
                     .font(.caption.weight(.semibold))
             }
-            .frame(width: 72, height: 64)
+            .frame(width: 80, height: 80)
         }
         .buttonStyle(AppButtonStyle(variant: .secondary))
         .scaleEffect(isPressed ? 0.94 : 1.0)
@@ -36,6 +36,9 @@ struct TapTempoButton: View {
 }
 
 #Preview {
-    TapTempoButton { }
-        .padding()
+    ZStack {
+        Color.coalBackground.ignoresSafeArea()
+        TapTempoButton { }
+    }
+    .padding()
 }

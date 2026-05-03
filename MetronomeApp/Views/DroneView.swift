@@ -2,13 +2,17 @@ import SwiftUI
 
 struct DroneView: View {
     @Environment(DroneViewModel.self) private var droneVM
+    @State private var keyScaleExpanded = true
+    @State private var soundExpanded = true
+    @State private var tuningExpanded = false
 
     var body: some View {
         @Bindable var vm = droneVM
 
         NavigationStack {
             ScrollView {
-                VStack(spacing: 20) {
+                VStack(spacing: 16) {
+                    // Play/Stop button
                     Button {
                         Task { @MainActor in await vm.togglePlayback() }
                     } label: {
@@ -24,27 +28,68 @@ struct DroneView: View {
                     .buttonStyle(AppButtonStyle(variant: vm.isPlaying ? .destructive : .primary))
                     .accessibilityLabel(vm.isPlaying ? "Stop drone" : "Start drone")
 
-                    LazyVGrid(columns: [.init(.flexible()), .init(.flexible())], spacing: 16) {
-                        keyPickerCard(vm: vm)
-                        scaleModeCard(vm: vm)
-                        octaveCard(vm: vm)
-                        intervalCard(vm: vm)
-                    }
+                    // Intervals — always visible, the main musical control
+                    intervalCard(vm: vm)
 
-                    WaveformPicker(selection: vm.configuration.waveform) { wf in
-                        Task { @MainActor in await vm.setWaveform(wf) }
+                    // Key & Scale
+                    DisclosureGroup(isExpanded: $keyScaleExpanded) {
+                        VStack(spacing: 14) {
+                            keyGrid(vm: vm)
+                            scaleModeRow(vm: vm)
+                        }
+                        .padding(.top, 10)
+                    } label: {
+                        Text("Key & Scale").sectionHeader()
                     }
-                    .cardStyle()
+                    .padding()
+                    .background(.regularMaterial)
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
 
-                    VolumeSliderCard(volume: $vm.configuration.volume) { v in
-                        Task { @MainActor in await vm.setVolume(v) }
+                    // Sound — Waveform, Octave, Volume
+                    DisclosureGroup(isExpanded: $soundExpanded) {
+                        VStack(spacing: 14) {
+                            waveformRow(vm: vm)
+                            octaveRow(vm: vm)
+                            volumeRow(
+                                volume: Bindable(vm).configuration.volume,
+                                onChange: { v in Task { @MainActor in await vm.setVolume(v) } }
+                            )
+                        }
+                        .padding(.top, 10)
+                    } label: {
+                        Text("Sound").sectionHeader()
                     }
+                    .padding()
+                    .background(.regularMaterial)
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
 
-                    referenceA4Card(vm: vm)
+                    // Tuning — collapsed by default
+                    DisclosureGroup(isExpanded: $tuningExpanded) {
+                        referenceA4Row(vm: vm)
+                            .padding(.top, 10)
+                    } label: {
+                        HStack {
+                            Text("Tuning").sectionHeader()
+                            Spacer()
+                            if !tuningExpanded {
+                                Text(String(format: "A4 = %.0f Hz", vm.configuration.referenceA4))
+                                    .font(.callout.monospacedDigit())
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    .padding()
+                    .background(.regularMaterial)
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 }
                 .padding()
             }
+            .scrollContentBackground(.hidden)
+            .background(Color.coalBackground)
             .navigationTitle("Drone")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Color.coalBackground, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
             .alert("Error", isPresented: Binding(
                 get: { vm.errorMessage != nil },
                 set: { if !$0 { vm.errorMessage = nil } }
@@ -56,92 +101,148 @@ struct DroneView: View {
         }
     }
 
-    private func keyPickerCard(vm: DroneViewModel) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Key")
-                .sectionHeader()
-            LazyVGrid(columns: Array(repeating: .init(.flexible(), spacing: 6), count: 3), spacing: 6) {
-                ForEach(MusicalKey.allCases) { key in
+    // MARK: - Section helpers
+
+    private func intervalCard(vm: DroneViewModel) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Intervals").sectionHeader()
+            HStack(spacing: 10) {
+                ForEach(DroneInterval.allCases) { interval in
+                    let active = vm.configuration.activeIntervals.contains(interval)
                     Button {
-                        Task { @MainActor in await vm.setKey(key) }
+                        Task { @MainActor in await vm.toggleInterval(interval) }
                     } label: {
-                        Text(key.rawValue)
+                        Text(interval.rawValue)
+                            .font(.callout.weight(.semibold))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 44)
+                            .background(active ? Color.accentColor : Color.white.opacity(0.08))
+                            .foregroundStyle(active ? Color.white : Color.primary)
+                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(interval.rawValue)
+                    .accessibilityAddTraits(active ? .isSelected : [])
+                }
+            }
+        }
+        .cardStyle()
+    }
+
+    private func keyGrid(vm: DroneViewModel) -> some View {
+        LazyVGrid(columns: Array(repeating: .init(.flexible(), spacing: 6), count: 4), spacing: 6) {
+            ForEach(MusicalKey.allCases) { key in
+                Button {
+                    Task { @MainActor in await vm.setKey(key) }
+                } label: {
+                    Text(key.rawValue)
+                        .font(.callout.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 36)
+                        .background(
+                            vm.configuration.key == key
+                                ? Color.accentColor
+                                : Color.white.opacity(0.08)
+                        )
+                        .foregroundStyle(vm.configuration.key == key ? Color.white : Color.primary)
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(vm.configuration.key == key ? .isSelected : [])
+            }
+        }
+    }
+
+    private func scaleModeRow(vm: DroneViewModel) -> some View {
+        HStack(spacing: 6) {
+            ForEach(ScaleMode.allCases) { mode in
+                Button {
+                    Task { @MainActor in await vm.setScaleMode(mode) }
+                } label: {
+                    Text(mode.rawValue)
+                        .font(.callout.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 36)
+                        .background(vm.configuration.scaleMode == mode ? Color.accentColor : Color.white.opacity(0.08))
+                        .foregroundStyle(vm.configuration.scaleMode == mode ? Color.white : Color.primary)
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(vm.configuration.scaleMode == mode ? .isSelected : [])
+            }
+        }
+    }
+
+    private func waveformRow(vm: DroneViewModel) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Waveform")
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.secondary)
+            HStack(spacing: 6) {
+                ForEach(Waveform.allCases) { wf in
+                    Button {
+                        Task { @MainActor in await vm.setWaveform(wf) }
+                    } label: {
+                        Text(wf.localizedName)
                             .font(.callout.weight(.semibold))
                             .frame(maxWidth: .infinity)
                             .frame(height: 36)
-                            .background(
-                                vm.configuration.key == key
-                                    ? Color.accentColor
-                                    : Color(.tertiarySystemBackground)
-                            )
-                            .foregroundStyle(vm.configuration.key == key ? Color.white : Color.primary)
+                            .background(vm.configuration.waveform == wf ? Color.accentColor : Color.white.opacity(0.08))
+                            .foregroundStyle(vm.configuration.waveform == wf ? Color.white : Color.primary)
                             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                     }
                     .buttonStyle(.plain)
-                    .accessibilityAddTraits(vm.configuration.key == key ? .isSelected : [])
+                    .accessibilityAddTraits(vm.configuration.waveform == wf ? .isSelected : [])
                 }
             }
         }
-        .cardStyle()
     }
 
-    private func scaleModeCard(vm: DroneViewModel) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Scale")
-                .sectionHeader()
-            Picker("Scale", selection: Binding(
-                get: { vm.configuration.scaleMode },
-                set: { mode in Task { @MainActor in await vm.setScaleMode(mode) } }
-            )) {
-                ForEach(ScaleMode.allCases) { mode in
-                    Text(mode.rawValue).tag(mode)
-                }
-            }
-            .pickerStyle(.menu)
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .cardStyle()
-    }
-
-    private func octaveCard(vm: DroneViewModel) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+    private func octaveRow(vm: DroneViewModel) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
             Text("Octave")
-                .sectionHeader()
-            Picker("Octave", selection: Binding(
-                get: { vm.configuration.octave },
-                set: { oct in Task { @MainActor in await vm.setOctave(oct) } }
-            )) {
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.secondary)
+            HStack(spacing: 6) {
                 ForEach(Octave.allCases) { oct in
-                    Text(oct.localizedName).tag(oct)
+                    Button {
+                        Task { @MainActor in await vm.setOctave(oct) }
+                    } label: {
+                        Text(oct.localizedName)
+                            .font(.callout.weight(.semibold))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 36)
+                            .background(vm.configuration.octave == oct ? Color.accentColor : Color.white.opacity(0.08))
+                            .foregroundStyle(vm.configuration.octave == oct ? Color.white : Color.primary)
+                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(vm.configuration.octave == oct ? .isSelected : [])
                 }
             }
-            .pickerStyle(.segmented)
         }
-        .cardStyle()
     }
 
-    private func intervalCard(vm: DroneViewModel) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Interval")
-                .sectionHeader()
-            Picker("Interval", selection: Binding(
-                get: { vm.configuration.additionalInterval },
-                set: { interval in Task { @MainActor in await vm.setInterval(interval) } }
-            )) {
-                ForEach(DroneInterval.allCases) { interval in
-                    Text(interval.rawValue).tag(interval)
-                }
+    private func volumeRow(volume: Binding<Float>, onChange: @escaping (Float) -> Void) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Volume")
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.secondary)
+            HStack {
+                Image(systemName: "speaker").foregroundStyle(.secondary)
+                Slider(value: volume, in: 0...1)
+                    .onChange(of: volume.wrappedValue) { _, v in onChange(v) }
+                Image(systemName: "speaker.wave.3").foregroundStyle(.secondary)
             }
-            .pickerStyle(.segmented)
         }
-        .cardStyle()
     }
 
-    private func referenceA4Card(vm: DroneViewModel) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+    private func referenceA4Row(vm: DroneViewModel) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text("Reference A4")
-                    .sectionHeader()
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.secondary)
                 Spacer()
                 Text(String(format: "%.0f Hz", vm.configuration.referenceA4))
                     .font(.callout.monospacedDigit())
@@ -158,28 +259,6 @@ struct DroneView: View {
             .accessibilityLabel("Reference A4")
             .accessibilityValue(String(format: "%.0f hertz", vm.configuration.referenceA4))
         }
-        .cardStyle()
-    }
-}
-
-private struct VolumeSliderCard: View {
-    @Binding var volume: Float
-    let onChange: (Float) -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Volume")
-                .sectionHeader()
-            HStack {
-                Image(systemName: "speaker")
-                    .foregroundStyle(.secondary)
-                Slider(value: $volume, in: 0...1)
-                    .onChange(of: volume) { _, v in onChange(v) }
-                Image(systemName: "speaker.wave.3")
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .cardStyle()
     }
 }
 

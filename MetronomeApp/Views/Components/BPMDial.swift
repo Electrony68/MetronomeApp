@@ -7,38 +7,53 @@ struct BPMDial: View {
     @State private var dragStartBPM: Double? = nil
     @State private var isDragging = false
 
-    private let dialSize: CGFloat = 240
-    private let sensitivity: Double = 0.4
+    private let dialSize: CGFloat = 360
+    private let trackDiameter: CGFloat = 280
+    private let trackLineWidth: CGFloat = 10
+    private let tickRadius: CGFloat = 162
+    private let tickCount = 60
+    private let sensitivity: Double = 0.5
 
     var body: some View {
         ZStack {
-            DialTrack(fraction: 1.0)
-                .stroke(.quaternary, style: StrokeStyle(lineWidth: 14, lineCap: .round))
+            // Decorative tick marks around the outer ring
+            ForEach(0..<tickCount, id: \.self) { i in
+                let major = i % 5 == 0
+                Rectangle()
+                    .fill(major ? Color.white.opacity(0.40) : Color.white.opacity(0.18))
+                    .frame(width: major ? 2.5 : 1.5, height: major ? 13 : 7)
+                    .offset(y: -tickRadius)
+                    .rotationEffect(.degrees(Double(i) / Double(tickCount) * 360))
+            }
 
-            DialTrack(fraction: max(normalizedBPM, 0.001))
-                .stroke(Color.accentColor, style: StrokeStyle(lineWidth: 14, lineCap: .round))
-
+            // Track ring (full circle background)
             Circle()
-                .fill(Color.white)
-                .shadow(color: .black.opacity(0.25), radius: 3, y: 2)
-                .frame(width: 20, height: 20)
-                .position(handlePosition)
+                .stroke(Color.white.opacity(0.10), lineWidth: trackLineWidth)
+                .frame(width: trackDiameter, height: trackDiameter)
 
-            VStack(spacing: 2) {
+            // Progress arc (starts at top, 12 o'clock)
+            Circle()
+                .trim(from: 0, to: normalizedBPM)
+                .stroke(Color.accentColor, style: StrokeStyle(lineWidth: trackLineWidth, lineCap: .round))
+                .frame(width: trackDiameter, height: trackDiameter)
+                .rotationEffect(.degrees(-90))
+
+            // BPM value in center
+            VStack(spacing: 4) {
                 Text(bpm.description)
-                    .font(.system(size: 56, weight: .bold, design: .rounded))
+                    .font(.system(size: 78, weight: .bold, design: .rounded))
                     .monospacedDigit()
+                    .foregroundStyle(.white)
                     .contentTransition(.numericText())
                 Text("BPM")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .textCase(.uppercase)
-                    .tracking(1)
+                    .font(.system(size: 11, weight: .heavy, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.40))
+                    .tracking(4)
             }
         }
         .frame(width: dialSize, height: dialSize)
-        .scaleEffect(isDragging ? 1.03 : 1.0)
-        .animation(.spring(response: 0.2, dampingFraction: 0.7), value: isDragging)
+        .scaleEffect(isDragging ? 1.02 : 1.0)
+        .animation(.spring(response: 0.25, dampingFraction: 0.75), value: isDragging)
         .gesture(
             DragGesture(minimumDistance: 0)
                 .onChanged { value in
@@ -47,8 +62,7 @@ struct BPMDial: View {
                         isDragging = true
                     }
                     let delta = -value.translation.height
-                    let newRaw = (dragStartBPM ?? bpm.rawValue) + delta * sensitivity
-                    onBPMChanged(BPM(rawValue: newRaw))
+                    onBPMChanged(BPM(rawValue: (dragStartBPM ?? bpm.rawValue) + delta * sensitivity))
                 }
                 .onEnded { _ in
                     dragStartBPM = nil
@@ -70,36 +84,11 @@ struct BPMDial: View {
     private var normalizedBPM: Double {
         (bpm.rawValue - BPM.range.lowerBound) / (BPM.range.upperBound - BPM.range.lowerBound)
     }
-
-    private var handlePosition: CGPoint {
-        let angle = Angle.degrees(135 + normalizedBPM * 270)
-        let radius = dialSize / 2 - 7
-        return CGPoint(
-            x: dialSize / 2 + radius * cos(angle.radians),
-            y: dialSize / 2 + radius * sin(angle.radians)
-        )
-    }
-}
-
-private struct DialTrack: Shape {
-    var fraction: Double
-
-    func path(in rect: CGRect) -> Path {
-        let center = CGPoint(x: rect.midX, y: rect.midY)
-        let radius = min(rect.width, rect.height) / 2 - 7
-        var path = Path()
-        path.addArc(
-            center: center,
-            radius: radius,
-            startAngle: .degrees(135),
-            endAngle: .degrees(135 + 270 * fraction),
-            clockwise: false
-        )
-        return path
-    }
 }
 
 #Preview {
-    BPMDial(bpm: BPM(rawValue: 120)) { _ in }
-        .padding()
+    ZStack {
+        Color.coalBackground.ignoresSafeArea()
+        BPMDial(bpm: BPM(rawValue: 120)) { _ in }
+    }
 }

@@ -35,7 +35,7 @@ struct AppButtonStyle: ButtonStyle {
         let opacity = pressed ? 0.8 : 1.0
         switch variant {
         case .primary:     return AnyShapeStyle(Color.accentColor.opacity(opacity))
-        case .secondary:   return AnyShapeStyle(Color(.tertiarySystemBackground))
+        case .secondary:   return AnyShapeStyle(Color.white.opacity(pressed ? 0.14 : 0.10))
         case .destructive: return AnyShapeStyle(Color.red.opacity(opacity))
         }
     }
